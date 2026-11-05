@@ -1,0 +1,86 @@
+{
+  "_comment": "Configuration for the customer & orders SDP pipeline (bronze + silver).",
+
+  "source": {
+    "path": "abfss://inboundfiles@unityms.dfs.core.windows.net/customer",
+    "format": "csv",
+    "options": {
+      "header": "true",
+      "cloudFiles.schemaEvolutionMode": "rescue"
+    },
+    "schema": "c_custkey INT, c_name STRING, c_address STRING, c_nationkey INT, c_phone STRING, c_acctbal DOUBLE, c_mktsegment STRING, c_comment STRING"
+  },
+
+  "bronze": {
+    "table_name": "customer_bronze",
+    "comment": "Raw customer records ingested from ADLS CSV files via Auto Loader.",
+    "table_properties": { "quality": "bronze" },
+    "expectations": {
+      "warn":         { "no rescued data": "_rescued_data IS NULL" },
+      "drop":         { "valid_key": "c_custkey IS NOT NULL" },
+      "fail":         {}
+    }
+  },
+
+  "silver": {
+    "table_name": "customer_silver",
+    "comment": "Cleaned and enriched customer data. Nulls dropped, segment upper-cased, ingest_date added.",
+    "table_properties": { "quality": "silver" },
+    "expectations": {
+      "warn":         { "reasonable_balance": "c_acctbal >= -999" },
+      "drop":         {
+        "valid_key":     "c_custkey IS NOT NULL",
+        "valid_name":    "c_name IS NOT NULL AND c_name != ''",
+        "valid_segment": "c_mktsegment IS NOT NULL"
+      },
+      "fail":         {}
+    },
+    "transforms": {
+      "trim_columns":      ["c_name"],
+      "upper_columns":     ["c_mktsegment"],
+      "replace_negatives": { "c_acctbal": 0.0 },
+      "drop_columns":      ["_rescued_data", "_ingest_ts"]
+    }
+  },
+
+  "orders": {
+    "source": {
+      "path": "abfss://inboundfiles@unityms.dfs.core.windows.net/orders",
+      "format": "csv",
+      "options": {
+        "header": "true",
+        "cloudFiles.schemaEvolutionMode": "rescue"
+      },
+      "schema": "o_orderkey INT, o_custkey INT, o_orderstatus STRING, o_totalprice DOUBLE, o_orderdate DATE, o_ordpriority STRING, o_clerk STRING, o_shippriority INT, o_comment STRING"
+    },
+    "bronze": {
+      "table_name": "orders_bronze",
+      "comment": "Raw order records ingested from ADLS CSV files via Auto Loader.",
+      "table_properties": { "quality": "bronze" },
+      "expectations": {
+        "warn":   { "no rescued data": "_rescued_data IS NULL" },
+        "drop":   { "valid_key": "o_orderkey IS NOT NULL" },
+        "fail":   {}
+      }
+    },
+    "silver": {
+      "table_name": "orders_silver",
+      "comment": "Cleaned and enriched order data. Null/invalid keys dropped, priority uppercased, ingest_date added.",
+      "table_properties": { "quality": "silver" },
+      "expectations": {
+        "warn":   { "sane_totalprice": "o_totalprice >= 0" },
+        "drop":   {
+          "valid_key": "o_orderkey IS NOT NULL",
+          "valid_status": "o_orderstatus IS NOT NULL AND o_orderstatus IN ('O','F','P')"
+        },
+        "fail":   {}
+      },
+      "transforms": {
+        "trim_columns": ["o_ordpriority", "o_clerk"],
+        "upper_columns": ["o_ordpriority", "o_orderstatus"],
+        "replace_negatives": { "o_totalprice": 0.0 },
+        "drop_columns": ["_rescued_data", "_ingest_ts"]
+      }
+    }
+  }
+}
