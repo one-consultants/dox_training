@@ -1,0 +1,7 @@
+# Declarative Automation Bundles local state
+.databricks/
+
+# Python
+__pycache__/
+*.pyc
+.venv/

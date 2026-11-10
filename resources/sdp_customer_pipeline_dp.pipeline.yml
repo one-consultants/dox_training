@@ -1,0 +1,17 @@
+# SDP pipeline using the modern @dp API (src/pipelines/sdp_customer_pipeline_dp.py)
+resources:
+  pipelines:
+    sdp_customer_pipeline_dp:
+      name: sdp_customer_pipeline_dp
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      continuous: false
+      channel: CURRENT
+      root_path: ../src/pipelines
+      libraries:
+        - file:
+            path: ../src/pipelines/sdp_customer_pipeline_dp.py
+      configuration:
+        # Read by _load_config() in the pipeline code
+        pipeline.config_path: ${workspace.file_path}/src/pipelines/config/${var.dp_config_file}

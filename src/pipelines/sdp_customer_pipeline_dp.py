@@ -10,7 +10,9 @@
 #   3. Reads:        `spark.readStream.table("name")`  (not `dlt.read_stream()`)
 #   4. New decorator: `@dp.materialized_view()` available  (no dlt equivalent)
 #
-# Both files read from the same  sdp_pipeline_config.json.
+# Config path is read from the Spark conf key  `pipeline.config_path`.
+# The bundle sets it in resources/sdp_customer_pipeline_dp.pipeline.yml:
+#   pipeline.config_path = ${workspace.file_path}/src/pipelines/config/${var.dp_config_file}
 # =============================================================================
 
 import json
@@ -26,15 +28,16 @@ from pyspark.sql.functions import (
 
 def _load_config() -> dict:
     """Read the JSON config file.  Path priority:
-    1. Spark conf  `pipeline.config_path`  (set in the pipeline UI)
-    2. Co-located  sdp_pipeline_config.json  (same folder as this script)
+    1. Spark conf  `pipeline.config_path`  (set by the bundle / pipeline settings)
+    2. config/sdp_pipeline_config_dp.json  next to this script
     """
     try:
         config_path = spark.conf.get("pipeline.config_path")
     except Exception:
         config_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
-            "sdp_pipeline_config.json",
+            "config",
+            "sdp_pipeline_config_dp.json",
         )
     with open(config_path, "r") as f:
         return json.load(f)

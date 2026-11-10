@@ -1,0 +1,17 @@
+# SDP pipeline using the legacy @dlt API (src/pipelines/sdp_customer_pipeline.py)
+resources:
+  pipelines:
+    sdp_customer_pipeline_dlt:
+      name: sdp_customer_pipeline_dlt
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      continuous: false
+      channel: CURRENT
+      root_path: ../src/pipelines
+      libraries:
+        - file:
+            path: ../src/pipelines/sdp_customer_pipeline.py
+      configuration:
+        # Read by _load_config() in the pipeline code
+        pipeline.config_path: ${workspace.file_path}/src/pipelines/config/${var.dlt_config_file}

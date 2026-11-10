@@ -1,14 +1,14 @@
 # =============================================================================
 # sdp_customer_pipeline.py
-# Configuration-driven SDP pipeline: bronze (Auto Loader) + silver (transform)
-# in a single file.  All tuneable parameters live in sdp_pipeline_config.json.
+# Configuration-driven SDP pipeline (legacy  @dlt  API): bronze (Auto Loader)
+# + silver (transform) in a single file.  All tuneable parameters live in a
+# JSON config file under src/pipelines/config/.
 #
 # Config path is read from the Spark conf key  `pipeline.config_path`.
-# If the key is not set, the pipeline looks for the JSON file in the same
-# directory as this script.
-#
-# To set the key, add this to the pipeline's Configuration section in the UI:
-#   pipeline.config_path  =  /Workspace/Repos/training/dox_training/sdp_pipeline_config.json
+# The bundle sets it in resources/sdp_customer_pipeline_dlt.pipeline.yml:
+#   pipeline.config_path = ${workspace.file_path}/src/pipelines/config/${var.dlt_config_file}
+# If the key is not set, the pipeline looks for config/sdp_pipeline_config_dlt.json
+# next to this script.
 # =============================================================================
 
 import json
@@ -24,8 +24,8 @@ from pyspark.sql.functions import (
 
 def _load_config() -> dict:
     """Read the JSON config file.  Path priority:
-    1. Spark conf  `pipeline.config_path`  (set in the pipeline UI)
-    2. Co-located  sdp_pipeline_config.json  (same folder as this script)
+    1. Spark conf  `pipeline.config_path`  (set by the bundle / pipeline settings)
+    2. config/sdp_pipeline_config_dlt.json  next to this script
     """
     try:
         config_path = spark.conf.get("pipeline.config_path")
@@ -33,7 +33,8 @@ def _load_config() -> dict:
         # Fall back to file next to this script
         config_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
-            "sdp_pipeline_config.json",
+            "config",
+            "sdp_pipeline_config_dlt.json",
         )
     with open(config_path, "r") as f:
         return json.load(f)

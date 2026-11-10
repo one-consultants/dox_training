@@ -1,0 +1,25 @@
+# Job that refreshes the two customer pipelines one after the other:
+#   1. sdp_customer_pipeline_dlt  ->  2. sdp_customer_pipeline_dp
+#
+# Pipeline tasks cannot receive job parameters. The config file for each
+# pipeline is set via the bundle variables dlt_config_file / dp_config_file
+# (see databricks.yml), which end up in each pipeline's
+# `pipeline.config_path` setting.
+resources:
+  jobs:
+    sdp_customer_pipelines_job:
+      name: sdp_customer_pipelines_job
+      description: Runs the @dlt customer pipeline, then the @dp customer pipeline.
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: run_sdp_customer_pipeline_dlt
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.sdp_customer_pipeline_dlt.id}
+            full_refresh: false
+
+        - task_key: run_sdp_customer_pipeline_dp
+          depends_on:
+            - task_key: run_sdp_customer_pipeline_dlt
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.sdp_customer_pipeline_dp.id}
+            full_refresh: false

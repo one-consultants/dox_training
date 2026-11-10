@@ -1,0 +1,49 @@
+# Declarative Automation Bundle for the dox_training repo.
+# Deploys the two customer SDP pipelines (dlt API + dp API) and a job that
+# runs them in sequence.
+#
+#   databricks bundle validate -t dev
+#   databricks bundle deploy   -t dev
+#   databricks bundle run      -t dev sdp_customer_pipelines_job
+#
+# Change a config file at deploy time, e.g.:
+#   databricks bundle deploy -t dev --var="dp_config_file=my_other_config.json"
+
+bundle:
+  name: dox_training
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog catalog for the pipeline tables
+    default: training
+  schema:
+    description: Schema for the pipeline tables (both pipelines share it; tables are prefixed dlt_ / dp_)
+    default: default
+  dlt_config_file:
+    description: Config file name (in src/pipelines/config) for the @dlt pipeline
+    default: sdp_pipeline_config_dlt.json
+  dp_config_file:
+    description: Config file name (in src/pipelines/config) for the @dp pipeline
+    default: sdp_pipeline_config_dp.json
+
+targets:
+  dev:
+    # Resources are prefixed "[dev <user>]", pipelines run in development mode,
+    # job schedules are paused. Deployed under the deploying user's home folder.
+    mode: development
+    default: true
+
+  prod:
+    # Deployed by CI/CD (GitHub Actions) with a service principal.
+    # Files live in the deploying principal's home folder (not writable by all users).
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    permissions:
+      - level: CAN_MANAGE
+        user_name: balaji.raghu@one-consultants.com
+      - level: CAN_VIEW
+        group_name: users

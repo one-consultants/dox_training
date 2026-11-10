@@ -1,0 +1,51 @@
+# CI/CD for the dox_training Declarative Automation Bundle
+#
+# Pull request -> validate the bundle (dev target)
+# Push to main -> validate + deploy to prod, then run the pipelines job
+#
+# Required GitHub repository secrets (service principal with OAuth M2M):
+#   DATABRICKS_HOST           e.g. https://adb-7405610410794404.<n>.azuredatabricks.net
+#   DATABRICKS_CLIENT_ID      service principal application (client) ID
+#   DATABRICKS_CLIENT_SECRET  service principal OAuth secret
+
+name: databricks-bundle
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: databricks-bundle-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+  DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+  DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main
+      - name: Validate bundle (dev)
+        run: databricks bundle validate -t dev
+
+  deploy-prod:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main
+      - name: Validate bundle (prod)
+        run: databricks bundle validate -t prod
+      - name: Deploy bundle (prod)
+        run: databricks bundle deploy -t prod
+      - name: Run pipelines job (prod)
+        run: databricks bundle run -t prod sdp_customer_pipelines_job

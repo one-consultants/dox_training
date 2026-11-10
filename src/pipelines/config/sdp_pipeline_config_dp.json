@@ -1,5 +1,5 @@
 {
-  "_comment": "Configuration for the customer & orders SDP pipeline (bronze + silver).",
+  "_comment": "Config for sdp_customer_pipeline_dp.py (@dp API). Tables are prefixed dp_ so they do not clash with the dlt pipeline in the same schema.",
 
   "source": {
     "path": "abfss://inboundfiles@unityms.dfs.core.windows.net/customer",
@@ -12,8 +12,8 @@
   },
 
   "bronze": {
-    "table_name": "customer_bronze",
-    "comment": "Raw customer records ingested from ADLS CSV files via Auto Loader.",
+    "table_name": "dp_customer_bronze",
+    "comment": "Raw customer records ingested from ADLS CSV files via Auto Loader (dp pipeline).",
     "table_properties": { "quality": "bronze" },
     "expectations": {
       "warn":         { "no rescued data": "_rescued_data IS NULL" },
@@ -23,8 +23,8 @@
   },
 
   "silver": {
-    "table_name": "customer_silver",
-    "comment": "Cleaned and enriched customer data. Nulls dropped, segment upper-cased, ingest_date added.",
+    "table_name": "dp_customer_silver",
+    "comment": "Cleaned and enriched customer data (dp pipeline). Nulls dropped, segment upper-cased, ingest_date added.",
     "table_properties": { "quality": "silver" },
     "expectations": {
       "warn":         { "reasonable_balance": "c_acctbal >= -999" },
@@ -54,8 +54,8 @@
       "schema": "o_orderkey INT, o_custkey INT, o_orderstatus STRING, o_totalprice DOUBLE, o_orderdate DATE, o_ordpriority STRING, o_clerk STRING, o_shippriority INT, o_comment STRING"
     },
     "bronze": {
-      "table_name": "orders_bronze",
-      "comment": "Raw order records ingested from ADLS CSV files via Auto Loader.",
+      "table_name": "dp_orders_bronze",
+      "comment": "Raw order records ingested from ADLS CSV files via Auto Loader (dp pipeline).",
       "table_properties": { "quality": "bronze" },
       "expectations": {
         "warn":   { "no rescued data": "_rescued_data IS NULL" },
@@ -64,8 +64,8 @@
       }
     },
     "silver": {
-      "table_name": "orders_silver",
-      "comment": "Cleaned and enriched order data. Null/invalid keys dropped, priority uppercased, ingest_date added.",
+      "table_name": "dp_orders_silver",
+      "comment": "Cleaned and enriched order data (dp pipeline). Null/invalid keys dropped, priority uppercased, ingest_date added.",
       "table_properties": { "quality": "silver" },
       "expectations": {
         "warn":   { "sane_totalprice": "o_totalprice >= 0" },
