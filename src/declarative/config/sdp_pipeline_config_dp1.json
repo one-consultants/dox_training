@@ -1,0 +1,122 @@
+{
+  "_comment": "Config for sdp_customer_pipeline_dp.py (dp API). The pipeline loops over every entry in 'sources' and creates bronze -> silver (-> gold, if present) for each. Tables are prefixed dp_.",
+
+  "sources": [
+  {
+  "name": "customer",
+  "source": {
+    "path": "abfss://inboundfiles@unityms.dfs.core.windows.net/customer",
+    "format": "csv",
+    "options": {
+      "header": "true",
+      "cloudFiles.schemaEvolutionMode": "rescue"
+    },
+    "schema": "c_custkey INT, c_name STRING, c_address STRING, c_nationkey INT, c_phone STRING, c_acctbal DOUBLE, c_mktsegment STRING, c_comment STRING"
+  },
+
+  "bronze": {
+    "table_name": "dp_customer_bronze",
+    "comment": "Raw customer records ingested from ADLS CSV files via Auto Loader (dp pipeline).",
+    "table_properties": { "quality": "bronze" },
+    "expectations": {
+      "warn":         {
+        "no rescued data": "_rescued_data IS NULL",
+        "valid_key":       "c_custkey IS NOT NULL"
+      },
+      "drop":         {},
+      "fail":         {}
+    }
+  },
+
+  "silver": {
+    "table_name": "dp_customer_silver",
+    "comment": "Cleaned and enriched customer data (dp pipeline). Nulls dropped, segment upper-cased, ingest_date added.",
+    "table_properties": { "quality": "silver" },
+    "expectations": {
+      "warn":         { "reasonable_balance": "c_acctbal >= -999" },
+      "drop":         {
+        "valid_key":     "c_custkey IS NOT NULL",
+        "valid_name":    "c_name IS NOT NULL AND c_name != ''",
+        "valid_segment": "c_mktsegment IS NOT NULL"
+      },
+      "fail":         {}
+    },
+    "transforms": {
+      "trim_columns":      ["c_name"],
+      "upper_columns":     ["c_mktsegment"],
+      "replace_negatives": { "c_acctbal": 0.0 },
+      "drop_columns":      ["_rescued_data", "_ingest_ts"]
+    }
+  }
+  },
+
+  {
+    "name": "orders",
+    "source": {
+      "path": "abfss://inboundfiles@unityms.dfs.core.windows.net/orders",
+      "format": "csv",
+      "options": {
+        "header": "true",
+        "cloudFiles.schemaEvolutionMode": "rescue"
+      },
+      "schema": "o_orderkey INT, o_custkey INT, o_orderstatus STRING, o_totalprice DOUBLE, o_orderdate DATE, o_orderpriority STRING, o_clerk STRING, o_shippriority INT, o_comment STRING"
+    },
+    "bronze": {
+      "table_name": "dp_orders_bronze",
+      "comment": "Raw order records ingested from ADLS CSV files via Auto Loader (dp pipeline).",
+      "table_properties": { "quality": "bronze" },
+      "expectations": {
+        "warn":   {
+          "no rescued data": "_rescued_data IS NULL",
+          "valid_key":       "o_orderkey IS NOT NULL"
+        },
+        "drop":   {},
+        "fail":   {}
+      }
+    },
+    "silver": {
+      "table_name": "dp_orders_silver",
+      "comment": "Cleaned and enriched order data (dp pipeline). Null/invalid keys dropped, priority uppercased, ingest_date added.",
+      "table_properties": { "quality": "silver" },
+      "expectations": {
+        "warn":   {
+          "sane_totalprice":  "o_totalprice >= 0",
+          "normal_order_value": "o_totalprice < 400000"
+        },
+        "drop":   {
+          "valid_key": "o_orderkey IS NOT NULL",
+          "valid_status": "o_orderstatus IS NOT NULL AND o_orderstatus IN ('O','F')"
+        },
+        "fail":   {}
+      },
+      "transforms": {
+        "trim_columns": ["o_orderpriority", "o_clerk"],
+        "upper_columns": ["o_orderpriority", "o_orderstatus"],
+        "replace_negatives": { "o_totalprice": 0.0 },
+        "drop_columns": ["_rescued_data", "_ingest_ts"]
+      }
+    },
+    "gold": {
+      "table_name": "dp_orders_gold_monthly",
+      "comment": "Gold: monthly order price metrics per customer (o_custkey), built from dp_orders_silver as a materialized view (dp pipeline).",
+      "table_properties": { "quality": "gold" },
+      "date_column": "o_orderdate",
+      "period": "month",
+      "period_column_name": "order_month",
+      "key_columns": ["o_custkey"],
+      "aggregations": {
+        "order_count": "count(o_orderkey)",
+        "total_price": "round(sum(o_totalprice), 2)",
+        "avg_price":   "round(avg(o_totalprice), 2)",
+        "min_price":   "min(o_totalprice)",
+        "max_price":   "max(o_totalprice)"
+      },
+      "expectations": {
+        "warn":   { "non_negative_total": "total_price >= 0" },
+        "drop":   { "valid_month": "order_month IS NOT NULL" },
+        "fail":   {}
+      }
+    }
+  }
+  ]
+}
